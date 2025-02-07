@@ -1,33 +1,93 @@
-import { StatusBar } from 'expo-status-bar';
-import { Platform, StyleSheet } from 'react-native';
+import { useState } from 'react';
+import { View, Button, Image, Text } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
 
-import { Text, View } from '@/components/Themed';
+const OCR_API_KEY = process.env.EXPO_PUBLIC_OCR_API_KEY;
 
 export default function ModalScreen() {
-  return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Modal</Text>
-      <View style={styles.separator} lightColor="#eee" darkColor="rgba(255,255,255,0.1)" />
+  const [image, setImage] = useState(null);
+  const [text, setText] = useState('');
 
-      {/* Use a light status bar on iOS to account for the black space above the modal */}
-      <StatusBar style={Platform.OS === 'ios' ? 'light' : 'auto'} />
+  const takePhoto = async () => {
+    let result = await ImagePicker.launchCameraAsync({
+      quality: 0.6,
+      allowsEditing: true,
+      base64: false,
+    });
+
+    if (!result.canceled) {
+      setImage(result.assets[0].uri);
+      extractText(result.assets[0].uri);
+    }
+  };
+
+  const selectImage = async () => {
+    let result = await ImagePicker.launchImageLibraryAsync({
+      quality: 0.6,
+      allowsMultipleSelection: false,
+      selectionLimit: 1,
+      allowsEditing: true,
+      base64: false,
+    });
+
+    if (!result.canceled) {
+      setImage(result.assets[0].uri);
+      extractText(result.assets[0].uri);
+    }
+  }
+
+  const [isProcessing, setIsProcessing] = useState(false);
+
+  const extractText = async (uri) => {
+    if (isProcessing) return; // Si ya está en proceso, no hacer nada
+    setIsProcessing(true); // Marcar como en proceso
+  
+    try {
+      let formData = new FormData();
+      formData.append('file', {
+        uri,
+        name: 'image.jpg',
+        type: 'image/jpeg',
+        language: 'spa',
+      });
+  
+      const response = await fetch('https://api.ocr.space/parse/image', {
+        method: 'POST',
+        headers: {
+          'apikey': OCR_API_KEY,
+        },
+        body: formData,
+      });
+
+      const result = await response.json();
+      console.log(result);
+      
+      const detectedText = result.ParsedResults?.[0]?.ParsedText || 'No se detectó texto';
+      const correctedText = detectedText
+        .replace(/å/g, 'á')
+        .replace(/ä/g, 'á')
+        .replace(/ë/g, 'é')
+        .replace(/ï/g, 'í')
+        .replace(/ô/g, 'ó')
+        .replace(/ö/g, 'ó')
+        .replace(/ü/g, 'ú');
+
+      setText(correctedText);
+    } catch (error) {
+      console.error('Error en OCR:', error);
+    } finally {
+      setIsProcessing(false); // Liberar el estado después de terminar
+    }
+  };
+  
+
+  return (
+    <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+      <Button title="Tomar Foto" onPress={takePhoto} />
+      <Button title="Seleccionar Imagen" onPress={selectImage} />
+      {image && <Image source={{ uri: image }} style={{ width: 300, height: 300 }} />}
+      {text ? <Text style={{ marginTop: 20, color: 'white' }}>{text}</Text> : null}
+      {isProcessing && <Text style={{ marginTop: 20, color: 'white' }}>Procesando...</Text>}
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  title: {
-    fontSize: 20,
-    fontWeight: 'bold',
-  },
-  separator: {
-    marginVertical: 30,
-    height: 1,
-    width: '80%',
-  },
-});
