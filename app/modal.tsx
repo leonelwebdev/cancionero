@@ -5,7 +5,7 @@ import * as ImagePicker from 'expo-image-picker';
 const OCR_API_KEY = process.env.EXPO_PUBLIC_OCR_API_KEY;
 
 export default function ModalScreen() {
-  const [image, setImage] = useState(null);
+  const [image, setImage] = useState('');
   const [text, setText] = useState('');
 
   const takePhoto = async () => {
@@ -38,12 +38,12 @@ export default function ModalScreen() {
 
   const [isProcessing, setIsProcessing] = useState(false);
 
-  const extractText = async (uri) => {
+  const extractText = async (uri: string) => {
     if (isProcessing) return; // Si ya está en proceso, no hacer nada
     setIsProcessing(true); // Marcar como en proceso
   
     try {
-      let formData = new FormData();
+      let formData: any = new FormData();
       formData.append('file', {
         uri,
         name: 'image.jpg',
@@ -54,14 +54,14 @@ export default function ModalScreen() {
       const response = await fetch('https://api.ocr.space/parse/image', {
         method: 'POST',
         headers: {
-          'apikey': OCR_API_KEY,
+          'apikey': `${OCR_API_KEY}`,
         },
         body: formData,
       });
 
       const result = await response.json();
       console.log(result);
-      
+
       const detectedText = result.ParsedResults?.[0]?.ParsedText || 'No se detectó texto';
       const correctedText = detectedText
         .replace(/å/g, 'á')
@@ -70,7 +70,21 @@ export default function ModalScreen() {
         .replace(/ï/g, 'í')
         .replace(/ô/g, 'ó')
         .replace(/ö/g, 'ó')
-        .replace(/ü/g, 'ú');
+        .replace(/ü/g, 'ú')
+
+        .replace(/sefior/g, 'Señor')
+        .replace(/Sefior/g, 'Señor')
+
+        .replace(/sehor/g, 'Señor')
+        .replace(/Sehor/g, 'Señor')
+
+        .replace(/seóor/g, 'Señor')
+        .replace(/Seóor/g, 'Señor')
+
+        .replace(/Aqui/g, 'Aquí')
+        .replace(/aqui/g, 'aquí')
+
+        .replace('\n', '\n\n');
 
       setText(correctedText);
     } catch (error) {
